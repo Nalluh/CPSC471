@@ -6,6 +6,80 @@
 
 import socket
 import sys
+import os 
+
+def list_text_files_in_directory(directory):
+    try:
+        # List all files in the given directory
+        files = os.listdir(directory)
+
+        # Filter for text files (files ending with '.txt')
+        text_files = [file for file in files if file.endswith('.txt')]
+
+        # Print the names of text files
+        if text_files:
+            print("Text files in {}:".format(directory))
+            for text_file in text_files:
+                print(text_file)
+        else:
+            print("No text files found in {}.".format(directory))
+    except FileNotFoundError:
+        print("Directory not found: {}".format(directory))
+
+def send_file(client_socket, file_path):
+    try:
+        # Open the file in binary mode
+        with open(file_path, 'rb') as file:
+            # Read the file content
+            file_data = file.read()
+
+            # Send the size of the file data
+            client_socket.send(str(len(file_data)).ljust(10).encode())
+
+            # Send the file data
+            client_socket.sendall(file_data)
+    except FileNotFoundError:
+        print("File not found: {}".format(file_path))
+        # Handle the case where the file is not found
+        
+def recvAll(sock, numBytes):
+        # The buffer
+        recvBuff = ""
+        
+        # The temporary buffer
+        tmpBuff = ""
+        
+        # Keep receiving until all is received
+        while len(recvBuff) < numBytes:
+            
+            # Attempt to receive bytes
+            tmpBuff = sock.recv(numBytes)
+            
+            # The other side has closed the socket
+            if not tmpBuff:
+                break
+            
+            # Add the received bytes to the buffer
+            recvBuff += tmpBuff
+        
+        return recvBuff
+
+def send_file(client_socket, file_path):
+    try:
+        # Open the file in binary mode
+        with open(file_path, 'rb') as file:
+            # Read the file content
+            file_data = file.read()
+
+            # Send the size of the file data
+            client_socket.send(str(len(file_data)).ljust(10).encode())
+
+            # Send the file data
+            client_socket.sendall(file_data)
+    except FileNotFoundError:
+        print("File not found: {}".format(file_path))
+        # Inform the client that the file was not found
+        client_socket.send(str(0).ljust(10).encode())
 
 # run command below on a terminal to start up server
 # py .\sendfileserv.py 1234
@@ -29,100 +103,46 @@ else:
     # Start listening on the socket
     welcomeSock.listen(1)
 
-    # ************************************************
-    # Receives the specified number of bytes
-    # from the specified socket
-    # @param sock - the socket from which to receive
-    # @param numBytes - the number of bytes to receive
-    # @return - the bytes received
-    # *************************************************
-    def recvAll(sock, numBytes):
-        # The buffer
-        recvBuff = ""
-        
-        # The temporary buffer
-        tmpBuff = ""
-        
-        # Keep receiving until all is received
-        while len(recvBuff) < numBytes:
-            
-            # Attempt to receive bytes
-            tmpBuff = sock.recv(numBytes)
-            
-            # The other side has closed the socket
-            if not tmpBuff:
-                break
-            
-            # Add the received bytes to the buffer
-            recvBuff += tmpBuff
-        
-        return recvBuff
+    #destination_directory = "Downloads"
+
+    isCon = False
     
-    def send_file(sock, file_name):
-     try:
-        # Open the file in binary mode
-        with open(file_name, 'rb') as file_obj:
-            # Read the file data
-            file_data = file_obj.read()
-            
-            # Get the size of the data and convert it to string
-            data_size_str = str(len(file_data))
-            
-            # Prepend 0's to the size string until the size is 10 bytes
-            data_size_str = data_size_str.zfill(10)
-            
-            # Send the size of the data to the client
-            sock.sendall(data_size_str.encode('utf-8'))
-            
-            # Send the file data to the client
-            sock.sendall(file_data)
-            
-            print("Sent {file_name} to the client.")
-     except IOError:
-        print("Error: File {file_name} not found.")
-
-
-
+    print "Waiting for connections..."
     # Accept connections forever
-    while True:
+while True:
         
-        print"Waiting for connections..."
-            
+
         # Accept connections
-        clientSock, addr = welcomeSock.accept()
+     clientSock, addr = welcomeSock.accept()
+     if not isCon:
+      print"Accepted connection from client:", addr
+      print"\n"
+      isCon = True
+
+     command = clientSock.recv(1024).decode()
+
+     if command == "put":
+      filename = clientSock.recv(1024).decode()
+
+            # Send the requested file to the client
+      send_file(clientSock, filename)
+
+     elif command == "get":
+       requested_file = clientSock.recv(1024).decode()
+       
+       #file_to_send = requested_file[1]
+       print requested_file
+       send_file(clientSock, file_to_send)
+
+
+     elif command == "ls":
+         directory_path =  os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'assn1_471/sendfile/server'))
+         list_text_files_in_directory(directory_path)
+    
+     elif command == "quit":
+           print("Connection has been closed...")
+           print("Goodbye...")
+           clientSock.close()
+           break
         
-        print"Accepted connection from client:", addr
-        print"\n"
-        
-        # The buffer to all data received from the
-        # client.
-        fileData = ""
-        
-        # The temporary buffer to store the received
-        # data.
-        recvBuff = ""
-        
-        # The size of the incoming file
-        fileSize = 0    
-        
-        # The buffer containing the file size
-        fileSizeBuff = ""
-        
-        # Receive the first 10 bytes indicating the
-        # size of the file
-        fileSizeBuff = recvAll(clientSock, 10)
-        
-        # Get the file size
-        fileSize = int(fileSizeBuff)
-        
-        print"The file size is", fileSize
-        
-        # Get the file data
-        fileData = recvAll(clientSock, fileSize)
-        
-        print"The file data is:"
-        print fileData
-            
-        # Close our side
-        clientSock.close()
-	
+      
